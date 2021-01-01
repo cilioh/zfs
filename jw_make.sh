@@ -1,7 +1,8 @@
 #!/bin/bash
 
-rm -rf *.rpm
-make clean
+
+#rm -rf *.rpm
+#make clean
 
 sh ./autogen.sh
 ./configure --with-spec=redhat
