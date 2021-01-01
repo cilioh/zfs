@@ -201,11 +201,20 @@
 #include "zfs_deleg.h"
 #include "zfs_comutil.h"
 
+
+//JW
+#include "/home/kau/zfs/include/hr_calclock.h"
+
 /*
  * Limit maximum nvlist size.  We don't want users passing in insane values
  * for zc->zc_nvlist_src_size, since we will need to allocate that much memory.
  */
 #define	MAX_NVLIST_SRC_SIZE	KMALLOC_MAX_SIZE
+
+//JW
+//unsigned long long enter_t, enter_c;
+//EXPORT_SYMBOL(enter_t);
+//EXPORT_SYMBOL(enter_c);
 
 kmutex_t zfsdev_state_lock;
 zfsdev_state_t *zfsdev_state_list;
@@ -6704,6 +6713,8 @@ zfs_allow_log_destroy(void *arg)
 #define	ZFS_DEBUG_STR	""
 #endif
 
+
+
 static int __init
 _init(void)
 {
@@ -6739,6 +6750,9 @@ _init(void)
 	printk(KERN_NOTICE "ZFS: Posix ACLs disabled by kernel\n");
 #endif /* CONFIG_FS_POSIX_ACL */
 
+//JW
+	printk(KERN_ERR "==========ZFS function profiling START==========\n");
+
 	return (0);
 
 out:
@@ -6766,6 +6780,21 @@ _fini(void)
 
 	printk(KERN_NOTICE "ZFS: Unloaded module v%s-%s%s\n",
 	    ZFS_META_VERSION, ZFS_META_RELEASE, ZFS_DEBUG_STR);
+
+//JW
+	printk(KERN_ERR "==========ZFS function profiling END==========\n");
+	printk(KERN_ERR "[__zio_execute] time:%llu count:%llu\n", a_t, a_c);
+	printk(KERN_ERR "[zio_write_bp_init] time:%llu count:%llu\n", aa_t, aa_c);
+	
+	printk(KERN_ERR "[zio_wait_for_children] time:%llu count:%llu\n", d_t, d_c);
+	/*printk(KERN_ERR "[zio_dva_throttle] time:%llu count:%llu\n", e_t, e_c);
+	printk(KERN_ERR "[zio_taksq_dispatch] time:%llu count:%llu\n", b_t, b_c);
+	printk(KERN_ERR "[zio_wait] time:%llu count:%llu\n", c_t, c_c);
+	printk(KERN_ERR "[zio_ready] time:%llu count:%llu\n", f_t, f_c);
+	printk(KERN_ERR "[zio_add_child] time:%llu count:%llu\n", g_t, g_c);
+	printk(KERN_ERR "[zio_remove_child] time:%llu count:%llu\n", h_t, h_c);
+	*/
+	printk(KERN_ERR "[dbuf_write] time:%llu count:%llu\n", dbuf_t, dbuf_c);
 }
 
 #ifdef HAVE_SPL

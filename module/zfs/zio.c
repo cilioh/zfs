@@ -44,11 +44,14 @@
 #include <sys/trace_zio.h>
 #include <sys/abd.h>
 
+//JW
+#include "/home/kau/zfs/include/hr_calclock.h"
 /*
  * ==========================================================================
  * I/O type descriptions
  * ==========================================================================
  */
+//JW1125
 const char *zio_type_name[ZIO_TYPES] = {
 	/*
 	 * Note: Linux kernel thread name length is limited
@@ -432,6 +435,7 @@ zio_unique_parent(zio_t *cio)
 	return (pio);
 }
 
+unsigned long long g_t=0, g_c=0;
 void
 zio_add_child(zio_t *pio, zio_t *cio)
 {
@@ -448,7 +452,8 @@ zio_add_child(zio_t *pio, zio_t *cio)
 
 	zl->zl_parent = pio;
 	zl->zl_child = cio;
-
+hrtime_t g_local[2];
+g_local[0] = gethrtime();
 	mutex_enter(&cio->io_lock);
 	mutex_enter(&pio->io_lock);
 
@@ -465,14 +470,18 @@ zio_add_child(zio_t *pio, zio_t *cio)
 
 	mutex_exit(&pio->io_lock);
 	mutex_exit(&cio->io_lock);
+g_local[1] = gethrtime();
+calclock(g_local, &g_t, &g_c);
 }
 
+unsigned long long h_t=0, h_c=0;
 static void
 zio_remove_child(zio_t *pio, zio_t *cio, zio_link_t *zl)
 {
 	ASSERT(zl->zl_parent == pio);
 	ASSERT(zl->zl_child == cio);
-
+hrtime_t h_local[2];
+h_local[0] = gethrtime();
 	mutex_enter(&cio->io_lock);
 	mutex_enter(&pio->io_lock);
 
@@ -485,13 +494,19 @@ zio_remove_child(zio_t *pio, zio_t *cio, zio_link_t *zl)
 	mutex_exit(&pio->io_lock);
 	mutex_exit(&cio->io_lock);
 	kmem_cache_free(zio_link_cache, zl);
+h_local[1] = gethrtime();
+calclock(h_local, &h_t, &h_c);
 }
 
+
+unsigned long long d_t=0, d_c=0;
 static boolean_t
 zio_wait_for_children(zio_t *zio, uint8_t childbits, enum zio_wait_type wait)
 {
 	boolean_t waiting = B_FALSE;
 
+hrtime_t d_local[2];
+d_local[0] = gethrtime();
 	mutex_enter(&zio->io_lock);
 	ASSERT(zio->io_stall == NULL);
 	for (int c = 0; c < ZIO_CHILD_TYPES; c++) {
@@ -508,6 +523,8 @@ zio_wait_for_children(zio_t *zio, uint8_t childbits, enum zio_wait_type wait)
 		}
 	}
 	mutex_exit(&zio->io_lock);
+d_local[1] = gethrtime();
+calclock(d_local, &d_t, &d_c);
 	return (waiting);
 }
 
@@ -1242,12 +1259,17 @@ zio_read_bp_init(zio_t *zio)
 	return (zio);
 }
 
+unsigned long long aa_t=0, aa_c=0;
 static zio_t *
 zio_write_bp_init(zio_t *zio)
 {
-
-	if (!IO_IS_ALLOCATING(zio))
+hrtime_t aa_local[2];
+aa_local[0] = gethrtime();
+	if (!IO_IS_ALLOCATING(zio)){
+aa_local[1] = gethrtime();
+calclock(aa_local, &aa_t, &aa_c);
 		return (zio);
+	}
 
 	ASSERT(zio->io_child_type != ZIO_CHILD_DDT);
 
@@ -1261,9 +1283,11 @@ zio_write_bp_init(zio_t *zio)
 		*bp = *zio->io_bp_override;
 		zio->io_pipeline = ZIO_INTERLOCK_PIPELINE;
 
-		if (BP_IS_EMBEDDED(bp))
+		if (BP_IS_EMBEDDED(bp)){
+aa_local[1] = gethrtime();
+calclock(aa_local, &aa_t, &aa_c);
 			return (zio);
-
+		}
 		/*
 		 * If we've been overridden and nopwrite is set then
 		 * set the flag accordingly to indicate that a nopwrite
@@ -1273,13 +1297,18 @@ zio_write_bp_init(zio_t *zio)
 			ASSERT(!zp->zp_dedup);
 			ASSERT3U(BP_GET_CHECKSUM(bp), ==, zp->zp_checksum);
 			zio->io_flags |= ZIO_FLAG_NOPWRITE;
+aa_local[1] = gethrtime();
+calclock(aa_local, &aa_t, &aa_c);	
 			return (zio);
 		}
 
 		ASSERT(!zp->zp_nopwrite);
 
-		if (BP_IS_HOLE(bp) || !zp->zp_dedup)
+		if (BP_IS_HOLE(bp) || !zp->zp_dedup){
+aa_local[1] = gethrtime();
+calclock(aa_local, &aa_t, &aa_c);
 			return (zio);
+		}
 
 		ASSERT((zio_checksum_table[zp->zp_checksum].ci_flags &
 		    ZCHECKSUM_FLAG_DEDUP) || zp->zp_dedup_verify);
@@ -1287,6 +1316,8 @@ zio_write_bp_init(zio_t *zio)
 		if (BP_GET_CHECKSUM(bp) == zp->zp_checksum) {
 			BP_SET_DEDUP(bp, 1);
 			zio->io_pipeline |= ZIO_STAGE_DDT_WRITE;
+aa_local[1] = gethrtime();
+calclock(aa_local, &aa_t, &aa_c);	
 			return (zio);
 		}
 
@@ -1298,7 +1329,8 @@ zio_write_bp_init(zio_t *zio)
 		*bp = zio->io_bp_orig;
 		zio->io_pipeline = zio->io_orig_pipeline;
 	}
-
+aa_local[1] = gethrtime();
+calclock(aa_local, &aa_t, &aa_c);	
 	return (zio);
 }
 
@@ -1480,9 +1512,12 @@ zio_write_compress(zio_t *zio)
 	return (zio);
 }
 
+unsigned long long bb_t=0, bb_c=0;
 static zio_t *
 zio_free_bp_init(zio_t *zio)
 {
+hrtime_t bb_local[2];
+bb_local[0] = gethrtime();
 	blkptr_t *bp = zio->io_bp;
 
 	if (zio->io_child_type == ZIO_CHILD_LOGICAL) {
@@ -1491,7 +1526,8 @@ zio_free_bp_init(zio_t *zio)
 	}
 
 	ASSERT3P(zio->io_bp, ==, &zio->io_bp_copy);
-
+bb_local[1] = gethrtime();
+calclock(bb_local, &bb_t, &bb_c);
 	return (zio);
 }
 
@@ -1501,6 +1537,8 @@ zio_free_bp_init(zio_t *zio)
  * ==========================================================================
  */
 
+//JW120
+unsigned long long b_t=0, b_c=0;
 static void
 zio_taskq_dispatch(zio_t *zio, zio_taskq_type_t q, boolean_t cutinline)
 {
@@ -1508,6 +1546,8 @@ zio_taskq_dispatch(zio_t *zio, zio_taskq_type_t q, boolean_t cutinline)
 	zio_type_t t = zio->io_type;
 	int flags = (cutinline ? TQ_FRONT : 0);
 
+//dprintf("[jw]");
+//dprintf("[jw]stage=%d\n", zio->io_stage);
 	/*
 	 * If we're a config writer or a probe, the normal issue and
 	 * interrupt threads may all be blocked waiting for the config lock.
@@ -1538,8 +1578,12 @@ zio_taskq_dispatch(zio_t *zio, zio_taskq_type_t q, boolean_t cutinline)
 	 * to dispatch the zio to another taskq at the same time.
 	 */
 	ASSERT(taskq_empty_ent(&zio->io_tqent));
+hrtime_t b_local[2];
+b_local[0] = gethrtime();
 	spa_taskq_dispatch_ent(spa, t, q, (task_func_t *)zio_execute, zio,
 	    flags, &zio->io_tqent);
+b_local[1] = gethrtime();
+calclock(b_local, &b_t, &b_c);
 }
 
 static boolean_t
@@ -1671,6 +1715,8 @@ static zio_pipe_stage_t *zio_pipeline[];
 void
 zio_execute(zio_t *zio)
 {
+//dprintf("[jw]");
+//dprintf("[jw]stage=%d\n", zio->io_stage);
 	fstrans_cookie_t cookie;
 
 	cookie = spl_fstrans_mark();
@@ -1703,10 +1749,16 @@ zio_execute_stack_check(zio_t *zio)
 	return (B_FALSE);
 }
 
+//JW
+unsigned long long a_t=0, a_c=0;
 __attribute__((always_inline))
 static inline void
 __zio_execute(zio_t *zio)
 {
+//JW1125
+//extern unsigned long long a_t, a_c;
+hrtime_t a_local[2];
+a_local[0] = gethrtime();
 	ASSERT3U(zio->io_queued_timestamp, >, 0);
 
 	while (zio->io_stage < ZIO_STAGE_DONE) {
@@ -1739,6 +1791,8 @@ __zio_execute(zio_t *zio)
 			boolean_t cut = (stage == ZIO_STAGE_VDEV_IO_START) ?
 			    zio_requeue_io_start_cut_in_line : B_FALSE;
 			zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE, cut);
+a_local[1] = gethrtime();
+calclock(a_local, &a_t, &a_c);
 			return;
 		}
 
@@ -1750,6 +1804,8 @@ __zio_execute(zio_t *zio)
 			boolean_t cut = (stage == ZIO_STAGE_VDEV_IO_START) ?
 			    zio_requeue_io_start_cut_in_line : B_FALSE;
 			zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE, cut);
+a_local[1] = gethrtime();
+calclock(a_local, &a_t, &a_c);			
 			return;
 		}
 
@@ -1762,9 +1818,11 @@ __zio_execute(zio_t *zio)
 		 * stop.
 		 */
 		zio = zio_pipeline[highbit64(stage) - 1](zio);
-
-		if (zio == NULL)
+		if (zio == NULL){
+a_local[1] = gethrtime();
+calclock(a_local, &a_t, &a_c);
 			return;
+		}
 	}
 }
 
@@ -1774,6 +1832,7 @@ __zio_execute(zio_t *zio)
  * Initiate I/O, either sync or async
  * ==========================================================================
  */
+unsigned long long c_t=0, c_c=0;
 int
 zio_wait(zio_t *zio)
 {
@@ -1787,12 +1846,14 @@ zio_wait(zio_t *zio)
 	zio->io_queued_timestamp = gethrtime();
 
 	__zio_execute(zio);
-
+hrtime_t a_local[2];
+a_local[0] = gethrtime();
 	mutex_enter(&zio->io_lock);
 	while (zio->io_executor != NULL)
 		cv_wait_io(&zio->io_cv, &zio->io_lock);
 	mutex_exit(&zio->io_lock);
-
+a_local[1] = gethrtime();
+calclock(a_local, &c_t, &c_c);
 	error = zio->io_error;
 	zio_destroy(zio);
 
@@ -2470,6 +2531,7 @@ zio_write_gang_block(zio_t *pio)
 static zio_t *
 zio_nop_write(zio_t *zio)
 {
+//dprintf("[jw]\n"); 
 	blkptr_t *bp = zio->io_bp;
 	blkptr_t *bp_orig = &zio->io_bp_orig;
 	zio_prop_t *zp = &zio->io_prop;
@@ -2976,6 +3038,8 @@ zio_io_to_allocate(spa_t *spa)
 	return (zio);
 }
 
+
+unsigned long long e_t=0, e_c=0;
 static zio_t *
 zio_dva_throttle(zio_t *zio)
 {
@@ -2993,7 +3057,8 @@ zio_dva_throttle(zio_t *zio)
 
 	ASSERT3U(zio->io_queued_timestamp, >, 0);
 	ASSERT(zio->io_stage == ZIO_STAGE_DVA_THROTTLE);
-
+hrtime_t e_local[2];
+e_local[0] = gethrtime();
 	mutex_enter(&spa->spa_alloc_lock);
 
 	ASSERT(zio->io_type == ZIO_TYPE_WRITE);
@@ -3001,7 +3066,8 @@ zio_dva_throttle(zio_t *zio)
 
 	nio = zio_io_to_allocate(zio->io_spa);
 	mutex_exit(&spa->spa_alloc_lock);
-
+e_local[1] = gethrtime();
+calclock(e_local, &e_t, &e_c);
 	return (nio);
 }
 
@@ -3491,6 +3557,9 @@ zio_checksum_generate(zio_t *zio)
 	blkptr_t *bp = zio->io_bp;
 	enum zio_checksum checksum;
 
+//jw
+//dprintf("[JW4]io_size=%u, io_orig_size=%u\n", zio->io_size, zio->io_orig_size);
+
 	if (bp == NULL) {
 		/*
 		 * This is zio_write_phys().
@@ -3589,6 +3658,7 @@ zio_worst_error(int e1, int e2)
  * I/O completion
  * ==========================================================================
  */
+unsigned long long f_t=0, f_c=0;
 static zio_t *
 zio_ready(zio_t *zio)
 {
@@ -3629,12 +3699,14 @@ zio_ready(zio_t *zio)
 			zio_allocate_dispatch(zio->io_spa);
 		}
 	}
-
+hrtime_t f_local[2];
+f_local[0] = gethrtime();
 	mutex_enter(&zio->io_lock);
 	zio->io_state[ZIO_WAIT_READY] = 1;
 	pio = zio_walk_parents(zio, &zl);
 	mutex_exit(&zio->io_lock);
-
+f_local[1] = gethrtime();
+calclock(f_local, &f_t, &f_c);
 	/*
 	 * As we notify zio's parents, new parents could be added.
 	 * New parents go to the head of zio's io_parent_list, however,
