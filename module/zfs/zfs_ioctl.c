@@ -6786,7 +6786,7 @@ _fini(void)
 	printk(KERN_ERR "[__zio_execute] time:%llu count:%llu\n", a_t, a_c);
 	printk(KERN_ERR "[zio_write_bp_init] time:%llu count:%llu\n", aa_t, aa_c);
 	
-	printk(KERN_ERR "[zio_wait_for_children] time:%llu count:%llu\n", d_t, d_c);
+	//printk(KERN_ERR "[zio_wait_for_children] time:%llu count:%llu\n", d_t, d_c);
 	/*printk(KERN_ERR "[zio_dva_throttle] time:%llu count:%llu\n", e_t, e_c);
 	printk(KERN_ERR "[zio_taksq_dispatch] time:%llu count:%llu\n", b_t, b_c);
 	printk(KERN_ERR "[zio_wait] time:%llu count:%llu\n", c_t, c_c);
@@ -6794,7 +6794,7 @@ _fini(void)
 	printk(KERN_ERR "[zio_add_child] time:%llu count:%llu\n", g_t, g_c);
 	printk(KERN_ERR "[zio_remove_child] time:%llu count:%llu\n", h_t, h_c);
 	*/
-	printk(KERN_ERR "[dbuf_write] time:%llu count:%llu\n", dbuf_t, dbuf_c);
+	//printk(KERN_ERR "[dbuf_write] time:%llu count:%llu\n", dbuf_t, dbuf_c);
 }
 
 #ifdef HAVE_SPL

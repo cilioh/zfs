@@ -12,7 +12,7 @@ extern unsigned long long f_t, f_c;
 extern unsigned long long g_t, g_c;
 extern unsigned long long h_t, h_c;
 
-extern unsigned long long dbuf_t, dbuf_c;
+//extern unsigned long long dbuf_t, dbuf_c;
 
 extern unsigned long long aa_t, aa_c;
 
