@@ -204,6 +204,13 @@
 
 //JW
 #include "/home/kau/zfs/include/hr_calclock.h"
+//#include <linux/kernel.h>
+//#include <linux/module.h>
+//#include <linux/init.h>
+//#include <linux/fs.h>
+//#include <linux/uaccess.h>
+//#include <asm/uaccess.h>
+
 
 /*
  * Limit maximum nvlist size.  We don't want users passing in insane values
@@ -6751,6 +6758,7 @@ _init(void)
 #endif /* CONFIG_FS_POSIX_ACL */
 
 //JW
+//	printk(KERN_ERR "==========SPINLOCK==========\n");
 	printk(KERN_ERR "==========ZFS function profiling START==========\n");
 
 	return (0);
@@ -6785,16 +6793,96 @@ _fini(void)
 	printk(KERN_ERR "==========ZFS function profiling END==========\n");
 	printk(KERN_ERR "[__zio_execute] time:%llu count:%llu\n", a_t, a_c);
 	printk(KERN_ERR "[zio_write_bp_init] time:%llu count:%llu\n", aa_t, aa_c);
+	printk(KERN_ERR "[zio_free_bp_init] time:%llu count:%llu\n", bb_t, bb_c);
+	printk(KERN_ERR "[zio_issue_async] time:%llu count:%llu\n", cc_t, cc_c);
+	printk(KERN_ERR "[zio_write_compress] time:%llu count:%llu\n", dd_t, dd_c);
+	printk(KERN_ERR "[zio_checksum_generate] time:%llu count:%llu\n", ee_t, ee_c);
+	printk(KERN_ERR "[zio_dva_throttle] time:%llu count:%llu\n", ff_t, ff_c);
+	printk(KERN_ERR "[zio_dva_allocate] time:%llu count:%llu\n", gg_t, gg_c);
+	printk(KERN_ERR "[zio_dva_free] time:%llu count:%llu\n", hh_t, hh_c);
+	printk(KERN_ERR "[zio_ready] time:%llu count:%llu\n", ii_t, ii_c);
+	printk(KERN_ERR "[zio_vdev_io_start] time:%llu count:%llu\n", jj_t, jj_c);
+	printk(KERN_ERR "[zio_vdev_io_done] time:%llu count:%llu\n", kk_t, kk_c);
+	printk(KERN_ERR "[zio_vdev_io_assess] time:%llu count:%llu\n", ll_t, ll_c);
+	printk(KERN_ERR "[zio_done] time:%llu count:%llu\n", m_t, m_c);
+
+	printk(KERN_ERR "====================\n");
+	//printk(KERN_ERR "[AA_zio_checksum_generate] time:%llu count:%llu\n", eea_t, eea_c);
+	printk(KERN_ERR "[BB_zio_checksum_generate] time:%llu count:%llu\n", eeb_t, eeb_c);
+	//printk(KERN_ERR "[CC_zio_checksum_generate] time:%llu count:%llu\n", eec_t, eec_c);
+	//printk(KERN_ERR "[DD_zio_checksum_generate] time:%llu count:%llu\n", eed_t, eed_c);
+	//printk(KERN_ERR "[EE_zio_checksum_generate] time:%llu count:%llu\n", eee_t, eee_c);
+	printk(KERN_ERR "[FF_zio_checksum_generate] time:%llu count:%llu\n", eef_t, eef_c);
+	printk(KERN_ERR "[abd_iterate_func] time:%llu count:%llu\n", aabd_t, aabd_c);
+	printk(KERN_ERR "[abd_B] time:%llu count:%llu\n", aabdb_t, aabdb_c);
 	
-	//printk(KERN_ERR "[zio_wait_for_children] time:%llu count:%llu\n", d_t, d_c);
-	/*printk(KERN_ERR "[zio_dva_throttle] time:%llu count:%llu\n", e_t, e_c);
+	printk(KERN_ERR "[abd_a] time:%llu count:%llu\n", abd_a_t, abd_a_c);
+	printk(KERN_ERR "[abd_b] time:%llu count:%llu\n", abd_b_t, abd_b_c);
+	printk(KERN_ERR "[abd_c] time:%llu count:%llu\n", abd_c_t, abd_c_c);
+	printk(KERN_ERR "[abd_d] time:%llu count:%llu\n", abd_d_t, abd_d_c);
+	printk(KERN_ERR "[abd_e] time:%llu count:%llu\n", abd_e_t, abd_e_c);
+	
+
+	printk(KERN_ERR "====================\n");
+	//printk(KERN_ERR "[AA_zio_ready] time:%llu count:%llu\n", iia_t, iia_c);
+	printk(KERN_ERR "[BB_zio_ready] time:%llu count:%llu\n", iib_t, iib_c);
+	//printk(KERN_ERR "[CC_zio_ready] time:%llu count:%llu\n", iic_t, iic_c);
+	//printk(KERN_ERR "[DD_zio_ready] time:%llu count:%llu\n", iid_t, iid_c);
+	printk(KERN_ERR "[mutex_enter] time:%llu count:%llu\n", enter_t, enter_c);
+	printk(KERN_ERR "[mutex_exit] time:%llu count:%llu\n", exit_t, exit_c);
+
+	printk(KERN_ERR "[BAA_zio_ready] time:%llu count:%llu\n", iiba_t, iiba_c);
+	//printk(KERN_ERR "[BBB_zio_ready] time:%llu count:%llu\n", iibb_t, iibb_c);
+	//printk(KERN_ERR "[BCC_zio_ready] time:%llu count:%llu\n", iibc_t, iibc_c);
+	
+	printk(KERN_ERR "=====================\n");
+	printk(KERN_ERR "[arc_write_ready] time:%llu count:%llu\n", j_t, j_c);
+	//printk(KERN_ERR "[JA_arc_write_ready] time:%llu count:%llu\n", ja_t, ja_c);
+	//printk(KERN_ERR "[JB_arc_write_ready] time:%llu count:%llu\n", jb_t, jb_c);
+	printk(KERN_ERR "[JC_arc_write_ready] time:%llu count:%llu\n", jc_t, jc_c);
+	
+	printk(KERN_ERR "=====================\n");
+	//printk(KERN_ERR "[JBA] time:%llu count:%llu\n", jba_t, jba_c);
+	//printk(KERN_ERR "[JBB] time:%llu count:%llu\n", jbb_t, jbb_c);
+	//printk(KERN_ERR "[JBC] time:%llu count:%llu\n", jbc_t, jbc_c);
+	//printk(KERN_ERR "[JCA] time:%llu count:%llu\n", jca_t, jca_c);
+	printk(KERN_ERR "[JCB] time:%llu count:%llu\n", jcb_t, jcb_c);
+	//printk(KERN_ERR "[JCC] time:%llu count:%llu\n", jcc_t, jcc_c);
+	//printk(KERN_ERR "[JCD] time:%llu count:%llu\n", jcd_t, jcd_c);
+
+
+	printk(KERN_ERR "=====================\n");
+	/*printk(KERN_ERR "[dbuf_write_ready] time:%llu count:%llu\n", k_t, k_c);
+	printk(KERN_ERR "[KA] time:%llu count:%llu\n", ka_t, ka_c);
+	printk(KERN_ERR "[KB] time:%llu count:%llu\n", kb_t, kb_c);
+	printk(KERN_ERR "[KC] time:%llu count:%llu\n", kc_t, kc_c);
+	printk(KERN_ERR "[KD] time:%llu count:%llu\n", kd_t, kd_c);
+	printk(KERN_ERR "[KE] time:%llu count:%llu\n", ke_t, ke_c);
+	*/
+	printk(KERN_ERR "[zio_wait_for_children] time:%llu count:%llu\n", d_t, d_c);
 	printk(KERN_ERR "[zio_taksq_dispatch] time:%llu count:%llu\n", b_t, b_c);
 	printk(KERN_ERR "[zio_wait] time:%llu count:%llu\n", c_t, c_c);
-	printk(KERN_ERR "[zio_ready] time:%llu count:%llu\n", f_t, f_c);
+	
+	printk(KERN_ERR "[zio_wait_for_children] time:%llu count:%llu\n", d_t, d_c);
 	printk(KERN_ERR "[zio_add_child] time:%llu count:%llu\n", g_t, g_c);
 	printk(KERN_ERR "[zio_remove_child] time:%llu count:%llu\n", h_t, h_c);
-	*/
+	
 	//printk(KERN_ERR "[dbuf_write] time:%llu count:%llu\n", dbuf_t, dbuf_c);
+	printk(KERN_ERR "[spa_taskq_dispatch_ent] time:%llu count:%llu\n", n_t+o_t, n_c+o_c);
+	printk(KERN_ERR "[ISSUE_spa_taskq] time:%llu count:%llu\n", n_t, n_c);
+	printk(KERN_ERR "[INTERRUPT_spa_taskq] time:%llu count:%llu\n", o_t, o_c);
+
+	printk(KERN_ERR "[total memcpy bytes] %llu\n", p_t);
+	//printk(KERN_ERR "[fletcher_4_avx2_native] time:%llu count:%llu\n", p_t, p_c);
+	printk(KERN_ERR "================[dbuf_sync_leaf]==============\n");
+	printk(KERN_ERR "[dbuf_write] time:%llu count:%llu\n", q_t, q_c);
+	printk(KERN_ERR "[zio_nowait] time:%llu count:%llu\n", r_t, r_c);
+	
+	printk(KERN_ERR "================[dbuf_sync_indirect]==============\n");
+	printk(KERN_ERR "[dbuf_write] time:%llu count:%llu\n", s_t, s_c);
+	printk(KERN_ERR "[zio_nowait] time:%llu count:%llu\n", t_t, t_c);
+
+
 }
 
 #ifdef HAVE_SPL

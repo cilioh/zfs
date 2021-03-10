@@ -48,6 +48,9 @@
 #include <sys/callb.h>
 #include <sys/abd.h>
 
+//JW
+#include "/home/kau/zfs/include/hr_calclock.h"
+
 struct dbuf_hold_impl_data {
 	/* Function arguments */
 	dnode_t *dh_dn;
@@ -3145,6 +3148,8 @@ dbuf_check_blkptr(dnode_t *dn, dmu_buf_impl_t *db)
 	}
 }
 
+unsigned long long s_t=0, s_c=0;
+unsigned long long t_t=0, t_c=0;
 /*
  * dbuf_sync_indirect() is called recursively from dbuf_sync_list() so it
  * is critical the we not allow the compiler to inline this function in to
@@ -3186,16 +3191,28 @@ dbuf_sync_indirect(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 	db->db_data_pending = dr;
 
 	mutex_exit(&db->db_mtx);
+hrtime_t s_local[2];
+s_local[0] = gethrtime();
 	dbuf_write(dr, db->db_buf, tx);
-
+s_local[1] = gethrtime();
+calclock(s_local, &s_t, &s_c);
+	
 	zio = dr->dr_zio;
 	mutex_enter(&dr->dt.di.dr_mtx);
 	dbuf_sync_list(&dr->dt.di.dr_children, db->db_level - 1, tx);
 	ASSERT(list_head(&dr->dt.di.dr_children) == NULL);
 	mutex_exit(&dr->dt.di.dr_mtx);
+hrtime_t t_local[2];
+t_local[0] = gethrtime();
 	zio_nowait(zio);
+t_local[1] = gethrtime();
+calclock(t_local, &t_t, &t_c);
+	
 }
 
+
+unsigned long long q_t=0, q_c=0;
+unsigned long long r_t=0, r_c=0;
 /*
  * dbuf_sync_leaf() is called recursively from dbuf_sync_list() so it is
  * critical the we not allow the compiler to inline this function in to
@@ -3349,8 +3366,11 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 
 	mutex_exit(&db->db_mtx);
 
+hrtime_t q_local[2];
+q_local[0] = gethrtime();
 	dbuf_write(dr, *datap, tx);
-
+q_local[1] = gethrtime();
+calclock(q_local, &q_t, &q_c);
 	ASSERT(!list_link_active(&dr->dr_dirty_node));
 	if (dn->dn_object == DMU_META_DNODE_OBJECT) {
 		list_insert_tail(&dn->dn_dirty_records[txg&TXG_MASK], dr);
@@ -3364,7 +3384,11 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 		 * zio_nowait() invalidates the dbuf.
 		 */
 		DB_DNODE_EXIT(db);
+hrtime_t r_local[2];
+r_local[0] = gethrtime();
 		zio_nowait(dr->dr_zio);
+r_local[1] = gethrtime();
+calclock(r_local, &r_t, &r_c);
 	}
 }
 
@@ -3398,6 +3422,13 @@ dbuf_sync_list(list_t *list, int level, dmu_tx_t *tx)
 	}
 }
 
+unsigned long long k_t=0, k_c=0;
+unsigned long long ka_t=0, ka_c=0;
+unsigned long long kb_t=0, kb_c=0;
+unsigned long long kc_t=0, kc_c=0;
+unsigned long long kd_t=0, kd_c=0;
+unsigned long long ke_t=0, ke_c=0;
+
 /* ARGSUSED */
 static void
 dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
@@ -3411,6 +3442,11 @@ dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
 	uint64_t fill = 0;
 	int i;
 
+hrtime_t k_local[2];
+k_local[0] = gethrtime();
+
+hrtime_t ka_local[2];
+ka_local[0] = gethrtime();
 	ASSERT3P(db->db_blkptr, !=, NULL);
 	ASSERT3P(&db->db_data_pending->dr_bp_copy, ==, bp);
 
@@ -3428,9 +3464,20 @@ dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
 		    BP_IS_EMBEDDED(bp));
 		ASSERT(BP_GET_LEVEL(bp) == db->db_level);
 	}
+ka_local[1] = gethrtime();
+calclock(ka_local, &ka_t, &ka_c);
 
+
+hrtime_t kb_local[2];
+kb_local[0] = gethrtime();
 	mutex_enter(&db->db_mtx);
+kb_local[1] = gethrtime();
+calclock(kb_local, &kb_t, &kb_c);
 
+
+
+hrtime_t kc_local[2];
+kc_local[0] = gethrtime();
 #ifdef ZFS_DEBUG
 	if (db->db_blkid == DMU_SPILL_BLKID) {
 		ASSERT(dn->dn_phys->dn_flags & DNODE_FLAG_SPILL_BLKPTR);
@@ -3438,7 +3485,6 @@ dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
 		    db->db_blkptr == DN_SPILL_BLKPTR(dn->dn_phys));
 	}
 #endif
-
 	if (db->db_level == 0) {
 		mutex_enter(&dn->dn_mtx);
 		if (db->db_blkid > dn->dn_phys->dn_maxblkid &&
@@ -3479,12 +3525,26 @@ dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
 
 	if (!BP_IS_EMBEDDED(bp))
 		bp->blk_fill = fill;
+kc_local[1] = gethrtime();
+calclock(kc_local, &kc_t, &kc_c);
 
+hrtime_t kd_local[2];
+kd_local[0] = gethrtime();
 	mutex_exit(&db->db_mtx);
+kd_local[1] = gethrtime();
+calclock(kd_local, &kd_t, &kd_c);
 
+hrtime_t ke_local[2];
+ke_local[0] = gethrtime();
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 	*db->db_blkptr = *bp;
 	rw_exit(&dn->dn_struct_rwlock);
+ke_local[1] = gethrtime();
+calclock(ke_local, &ke_t, &ke_c);
+
+k_local[1] = gethrtime();
+calclock(k_local, &k_t, &k_c);
+
 }
 
 /* ARGSUSED */

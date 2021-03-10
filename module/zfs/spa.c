@@ -92,6 +92,8 @@
 #include "zfs_prop.h"
 #include "zfs_comutil.h"
 
+//JW
+#include "/home/kau/zfs/include/hr_calclock.h"
 /*
  * The interval, in seconds, at which failed configuration cache file writes
  * should be retried.
@@ -937,9 +939,9 @@ spa_taskqs_init(spa_t *spa, zio_type_t t, zio_taskq_type_t q)
 			 */
 			if (t == ZIO_TYPE_WRITE && q == ZIO_TASKQ_ISSUE)
 				pri++;
-
 			tq = taskq_create_proc(name, value, pri, 50,
 			    INT_MAX, spa->spa_proc, flags);
+			dprintf("[%s] nthreads:%d\n", name, tq->tq_nthreads);
 		}
 
 		tqs->stqs_taskq[i] = tq;
@@ -972,23 +974,68 @@ spa_taskqs_fini(spa_t *spa, zio_type_t t, zio_taskq_type_t q)
  * on the taskq itself. In that case we choose which taskq at random by using
  * the low bits of gethrtime().
  */
+unsigned long long n_t=0, n_c=0;
+unsigned long long o_t=0, o_c=0;
+int jww=0;
 void
 spa_taskq_dispatch_ent(spa_t *spa, zio_type_t t, zio_taskq_type_t q,
     task_func_t *func, void *arg, uint_t flags, taskq_ent_t *ent)
 {
+hrtime_t n_local[2];
+hrtime_t o_local[2];
+if (q == ZIO_TASKQ_ISSUE) 
+	n_local[0] = gethrtime();
+else if (q == ZIO_TASKQ_INTERRUPT)
+	o_local[0] = gethrtime();
+
 	spa_taskqs_t *tqs = &spa->spa_zio_taskq[t][q];
 	taskq_t *tq;
 
 	ASSERT3P(tqs->stqs_taskq, !=, NULL);
 	ASSERT3U(tqs->stqs_count, !=, 0);
 
+//JW: z_wr_iss stqs_count=1
 	if (tqs->stqs_count == 1) {
 		tq = tqs->stqs_taskq[0];
 	} else {
 		tq = tqs->stqs_taskq[((uint64_t)gethrtime()) % tqs->stqs_count];
 	}
+/*
+int active = 0;
+if(q == ZIO_TASKQ_ISSUE) {
+	if (jww%100 == 0){
+#ifdef _KERNEL
+		dprintf("[jw]name:%s nthreads:%d active:%d spawn:%d\n", tq->tq_name, tq->tq_nthreads, tq->tq_nactive, tq->tq_nspawn);
+#else
+		dprintf("[jw]name:%s nthreads:%d active:%d\n", tq->tq_name, tq->tq_nthreads, tq->tq_active);
+#endif
+	}
+	jww++;
+#ifdef _KERNEL
+	active = tq->tq_nactive;
+#else
+	active = tq->tq_active;
+#endif
+}
+	if (q == ZIO_TASKQ_ISSUE){
+	//	while (active > 12) {
+	//	}
+		taskq_dispatch_ent(tq, func, arg, flags, ent);
+	}
+	else
+		taskq_dispatch_ent(tq, func, arg, flags, ent);
+*/
 
 	taskq_dispatch_ent(tq, func, arg, flags, ent);
+
+if (q == ZIO_TASKQ_ISSUE){
+	n_local[1] = gethrtime();
+	calclock(n_local, &n_t, &n_c);
+}
+else if (q == ZIO_TASKQ_INTERRUPT) {
+	o_local[1] = gethrtime();
+	calclock(o_local, &o_t, &o_c);
+}
 }
 
 /*

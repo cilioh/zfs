@@ -38,6 +38,9 @@
 #include <sys/zio.h>
 #include <sys/zio_compress.h>
 
+//JW
+#include "/home/kau/zfs/include/hr_calclock.h"
+
 /*
  * Compression vectors.
  */
@@ -84,17 +87,23 @@ zio_compress_select(spa_t *spa, enum zio_compress child,
 	return (result);
 }
 
+unsigned long long abd_e_t=0, abd_e_c=0;
 /*ARGSUSED*/
 static int
 zio_compress_zeroed_cb(void *data, size_t len, void *private)
 {
 	uint64_t *end = (uint64_t *)((char *)data + len);
 	uint64_t *word;
-
+hrtime_t abd_e_local[2];
+abd_e_local[0] = gethrtime();
 	for (word = data; word < end; word++)
-		if (*word != 0)
+		if (*word != 0){
+abd_e_local[1] = gethrtime();
+calclock(abd_e_local, &abd_e_t, &abd_e_c);
 			return (1);
-
+		}
+abd_e_local[1] = gethrtime();
+calclock(abd_e_local, &abd_e_t, &abd_e_c);	
 	return (0);
 }
 

@@ -181,6 +181,7 @@ taskq_dispatch_ent(taskq_t *tq, task_func_t func, void *arg, uint_t flags,
 	t->tqent_prev->tqent_next = t;
 	t->tqent_func = func;
 	t->tqent_arg = arg;
+//JW: waking up one of the z_wr_iss 24 threads
 	cv_signal(&tq->tq_dispatch_cv);
 	mutex_exit(&tq->tq_lock);
 }
@@ -230,6 +231,7 @@ taskq_thread(void *arg)
 		mutex_exit(&tq->tq_lock);
 
 		rw_enter(&tq->tq_threadlock, RW_READER);
+//JW: this is calling zio_execute function		
 		t->tqent_func(t->tqent_arg);
 		rw_exit(&tq->tq_threadlock);
 
@@ -263,7 +265,6 @@ taskq_create(const char *name, int nthreads, pri_t pri,
 	} else {
 		ASSERT3S(nthreads, >=, 1);
 	}
-
 	rw_init(&tq->tq_threadlock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&tq->tq_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&tq->tq_dispatch_cv, NULL, CV_DEFAULT, NULL);
@@ -292,6 +293,12 @@ taskq_create(const char *name, int nthreads, pri_t pri,
 		    taskq_thread, tq, 0, &p0, TS_RUN, pri)) != NULL);
 
 	return (tq);
+}
+
+int
+taskq_get_active(taskq_t *tq)
+{
+	return tq->tq_active;
 }
 
 void

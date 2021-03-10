@@ -31,11 +31,19 @@
 #include <sys/sha2.h>
 #include <sys/abd.h>
 
+//JW
+#include "/home/kau/zfs/include/hr_calclock.h"
+
+unsigned long long abd_d_t=0, abd_d_c=0;
 static int
 sha_incremental(void *buf, size_t size, void *arg)
 {
+hrtime_t abd_d_local[2];
+abd_d_local[0] = gethrtime();
 	SHA2_CTX *ctx = arg;
 	SHA2Update(ctx, buf, size);
+abd_d_local[1] = gethrtime();
+calclock(abd_d_local, &abd_d_t, &abd_d_c);
 	return (0);
 }
 

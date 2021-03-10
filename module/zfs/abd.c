@@ -126,6 +126,9 @@
 #define	MAX_ORDER	1
 #endif
 
+//JW
+#include "/home/kau/zfs/include/hr_calclock.h"
+
 typedef struct abd_stats {
 	kstat_named_t abdstat_struct_size;
 	kstat_named_t abdstat_linear_cnt;
@@ -1094,6 +1097,11 @@ abd_iter_unmap(struct abd_iter *aiter)
 	aiter->iter_mapsize = 0;
 }
 
+unsigned long long aabd_t=0, aabd_c=0;
+unsigned long long aabda_t=0, aabda_c=0;
+unsigned long long aabdb_t=0, aabdb_c=0;
+unsigned long long aabdc_t=0, aabdc_c=0;
+unsigned long long aabdd_t=0, aabdd_c=0;
 int
 abd_iterate_func(abd_t *abd, size_t off, size_t size,
     abd_iter_func_t *func, void *private)
@@ -1101,30 +1109,40 @@ abd_iterate_func(abd_t *abd, size_t off, size_t size,
 	int ret = 0;
 	struct abd_iter aiter;
 
+//hrtime_t aabd_local[2];
+//aabd_local[0] = gethrtime();
 	abd_verify(abd);
 	ASSERT3U(off + size, <=, abd->abd_size);
 
 	abd_iter_init(&aiter, abd, 0);
 	abd_iter_advance(&aiter, off);
-
+hrtime_t aabd_local[2];
+aabd_local[0] = gethrtime();
+	
 	while (size > 0) {
 		size_t len;
 		abd_iter_map(&aiter);
 
 		len = MIN(aiter.iter_mapsize, size);
 		ASSERT3U(len, >, 0);
-
+hrtime_t aabdb_local[2];
+aabdb_local[0] = gethrtime();
+//JW: z_wr_iss calling abd_copy_from_buf_off_cb
+//JW: z_wr_iss calling calling abd_fletcher_4_iter
 		ret = func(aiter.iter_mapaddr, len, private);
-
+aabdb_local[1] = gethrtime();
+calclock(aabdb_local, &aabdb_t, &aabdb_c);
+		
 		abd_iter_unmap(&aiter);
-
+	
 		if (ret != 0)
 			break;
 
 		size -= len;
 		abd_iter_advance(&aiter, len);
 	}
-
+aabd_local[1] = gethrtime();
+calclock(aabd_local, &aabd_t, &aabd_c);
 	return (ret);
 }
 
@@ -1155,6 +1173,7 @@ abd_copy_to_buf_off(void *buf, abd_t *abd, size_t off, size_t size)
 	    &ba_ptr);
 }
 
+
 static int
 abd_cmp_buf_off_cb(void *buf, size_t size, void *private)
 {
@@ -1178,12 +1197,19 @@ abd_cmp_buf_off(abd_t *abd, const void *buf, size_t off, size_t size)
 	return (abd_iterate_func(abd, off, size, abd_cmp_buf_off_cb, &ba_ptr));
 }
 
+unsigned long long abd_a_t=0, abd_a_c=0;
+unsigned long long p_t=0;
 static int
 abd_copy_from_buf_off_cb(void *buf, size_t size, void *private)
 {
 	struct buf_arg *ba_ptr = private;
 
+hrtime_t abd_a_local[2];
+abd_a_local[0] = gethrtime();
 	(void) memcpy(buf, ba_ptr->arg_buf, size);
+p_t += size;
+abd_a_local[1] = gethrtime();
+calclock(abd_a_local, &abd_a_t, &abd_a_c);
 	ba_ptr->arg_buf = (char *)ba_ptr->arg_buf + size;
 
 	return (0);
@@ -1196,16 +1222,21 @@ void
 abd_copy_from_buf_off(abd_t *abd, const void *buf, size_t off, size_t size)
 {
 	struct buf_arg ba_ptr = { (void *) buf };
-
+//JW0124: test removing -> NOPE
 	(void) abd_iterate_func(abd, off, size, abd_copy_from_buf_off_cb,
 	    &ba_ptr);
 }
 
+unsigned long long abd_b_t=0, abd_b_c=0;
 /*ARGSUSED*/
 static int
 abd_zero_off_cb(void *buf, size_t size, void *private)
 {
+hrtime_t abd_b_local[2];
+abd_b_local[0] = gethrtime();
 	(void) memset(buf, 0, size);
+abd_b_local[1] = gethrtime();
+calclock(abd_b_local, &abd_b_t, &abd_b_c);
 	return (0);
 }
 

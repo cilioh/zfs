@@ -273,6 +273,8 @@ typedef struct kmutex {
 	void		*m_owner;
 	uint64_t	m_magic;
 	pthread_mutex_t	m_lock;
+//JW
+	pthread_spinlock_t s_lock;
 } kmutex_t;
 
 #define	MUTEX_DEFAULT	0

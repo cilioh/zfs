@@ -47,6 +47,8 @@
 #include <zfs_fletcher.h>
 #include <strings.h>
 
+//JW
+#include "/home/kau/zfs/include/hr_calclock.h"
 static void
 fletcher_4_avx2_init(fletcher_4_ctx_t *ctx)
 {
@@ -97,10 +99,12 @@ fletcher_4_avx2_fini(fletcher_4_ctx_t *ctx, zio_cksum_t *zcp)
 	asm volatile("vmovdqu %%ymm3, %0" : "=m" ((ctx)->avx[3]));	\
 }
 
-
+//unsigned long long p_t=0, p_c=0;
 static void
 fletcher_4_avx2_native(fletcher_4_ctx_t *ctx, const void *buf, uint64_t size)
 {
+//hrtime_t p_local[2];
+//p_local[0] = gethrtime();
 	const uint64_t *ip = buf;
 	const uint64_t *ipend = (uint64_t *)((uint8_t *)ip + size);
 
@@ -120,6 +124,8 @@ fletcher_4_avx2_native(fletcher_4_ctx_t *ctx, const void *buf, uint64_t size)
 	asm volatile("vzeroupper");
 
 	kfpu_end();
+//p_local[1] = gethrtime();
+//calclock(p_local, &p_t, &p_c);
 }
 
 static void

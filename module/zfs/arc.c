@@ -294,6 +294,9 @@
 boolean_t arc_watch = B_FALSE;
 #endif
 
+//JW
+#include "/home/kau/zfs/include/hr_calclock.h"
+
 static kmutex_t		arc_reclaim_lock;
 static kcondvar_t	arc_reclaim_thread_cv;
 static boolean_t	arc_reclaim_thread_exit;
@@ -1510,6 +1513,7 @@ arc_cksum_is_equal(arc_buf_hdr_t *hdr, zio_t *zio)
  * isn't modified later on. If buf is compressed or there is already a checksum
  * on the hdr, this is a no-op (we only checksum uncompressed bufs).
  */
+
 static void
 arc_cksum_compute(arc_buf_t *buf)
 {
@@ -1537,6 +1541,7 @@ arc_cksum_compute(arc_buf_t *buf)
 	    hdr->b_l1hdr.b_freeze_cksum);
 	mutex_exit(&hdr->b_l1hdr.b_freeze_lock);
 	arc_buf_watch(buf);
+
 }
 
 #ifndef _KERNEL
@@ -5877,9 +5882,26 @@ arc_referenced(arc_buf_t *buf)
 }
 #endif
 
+unsigned long long j_t=0, j_c=0;
+unsigned long long ja_t=0, ja_c=0;
+unsigned long long jb_t=0, jb_c=0;
+unsigned long long jc_t=0, jc_c=0;
+
+unsigned long long jba_t=0, jba_c=0;
+unsigned long long jbb_t=0, jbb_c=0;
+unsigned long long jbc_t=0, jbc_c=0;
+
+unsigned long long jca_t=0, jca_c=0;
+unsigned long long jcb_t=0, jcb_c=0;
+unsigned long long jcc_t=0, jcc_c=0;
+unsigned long long jcd_t=0, jcd_c=0;
+
 static void
 arc_write_ready(zio_t *zio)
 {
+hrtime_t j_local[2];
+j_local[0] = gethrtime();
+
 	arc_write_callback_t *callback = zio->io_private;
 	arc_buf_t *buf = callback->awcb_buf;
 	arc_buf_hdr_t *hdr = buf->b_hdr;
@@ -5891,6 +5913,8 @@ arc_write_ready(zio_t *zio)
 	ASSERT(!zfs_refcount_is_zero(&buf->b_hdr->b_l1hdr.b_refcnt));
 	ASSERT(hdr->b_l1hdr.b_bufcnt > 0);
 
+hrtime_t ja_local[2];
+ja_local[0] = gethrtime();
 	/*
 	 * If we're reexecuting this zio because the pool suspended, then
 	 * cleanup any state that was previously set the first time the
@@ -5907,15 +5931,26 @@ arc_write_ready(zio_t *zio)
 			}
 		}
 	}
+ja_local[1] = gethrtime();
+calclock(ja_local, &ja_t, &ja_c);
+
+hrtime_t jb_local[2];
+jb_local[0] = gethrtime();
 	ASSERT3P(hdr->b_l1hdr.b_pabd, ==, NULL);
 	ASSERT(!HDR_SHARED_DATA(hdr));
 	ASSERT(!arc_buf_is_shared(buf));
-
+hrtime_t jba_local[2];
+jba_local[0] = gethrtime();
+//JW: calling dbuf_write_ready
 	callback->awcb_ready(zio, buf, callback->awcb_private);
 
 	if (HDR_IO_IN_PROGRESS(hdr))
 		ASSERT(zio->io_flags & ZIO_FLAG_REEXECUTED);
+jba_local[1] = gethrtime();
+calclock(jba_local, &jba_t, &jba_c);
 
+hrtime_t jbb_local[2];
+jbb_local[0] = gethrtime();
 	arc_cksum_compute(buf);
 	arc_hdr_set_flags(hdr, ARC_FLAG_IO_IN_PROGRESS);
 
@@ -5925,9 +5960,22 @@ arc_write_ready(zio_t *zio)
 		ASSERT3U(HDR_GET_LSIZE(hdr), ==, BP_GET_LSIZE(zio->io_bp));
 		compress = BP_GET_COMPRESS(zio->io_bp);
 	}
+jbb_local[1] = gethrtime();
+calclock(jbb_local, &jbb_t, &jbb_c);
+
+
+hrtime_t jbc_local[2];
+jbc_local[0] = gethrtime();
 	HDR_SET_PSIZE(hdr, psize);
 	arc_hdr_set_compress(hdr, compress);
+jbc_local[1] = gethrtime();
+calclock(jbc_local, &jbc_t, &jbc_c);
 
+jb_local[1] = gethrtime();
+calclock(jb_local, &jb_t, &jb_c);
+
+hrtime_t jc_local[2];
+jc_local[0] = gethrtime();
 	/*
 	 * Fill the hdr with data. If the hdr is compressed, the data we want
 	 * is available from the zio, otherwise we can take it from the buf.
@@ -5942,34 +5990,60 @@ arc_write_ready(zio_t *zio)
 	 */
 	if (zfs_abd_scatter_enabled || !arc_can_share(hdr, buf)) {
 		arc_hdr_alloc_pabd(hdr);
-
 		/*
 		 * Ideally, we would always copy the io_abd into b_pabd, but the
 		 * user may have disabled compressed ARC, thus we must check the
 		 * hdr's compression setting rather than the io_bp's.
 		 */
 		if (HDR_GET_COMPRESS(hdr) != ZIO_COMPRESS_OFF) {
+hrtime_t jca_local[2];
+jca_local[0] = gethrtime();
+	
 			ASSERT3U(BP_GET_COMPRESS(zio->io_bp), !=,
 			    ZIO_COMPRESS_OFF);
 			ASSERT3U(psize, >, 0);
 
 			abd_copy(hdr->b_l1hdr.b_pabd, zio->io_abd, psize);
-		} else {
-			ASSERT3U(zio->io_orig_size, ==, arc_hdr_size(hdr));
+jca_local[1] = gethrtime();
+calclock(jca_local, &jca_t, &jca_c);
 
+
+		} else {
+hrtime_t jcb_local[2];
+jcb_local[0] = gethrtime();
+	
+			ASSERT3U(zio->io_orig_size, ==, arc_hdr_size(hdr));
+			//JW: calling abd_iterate_func
 			abd_copy_from_buf(hdr->b_l1hdr.b_pabd, buf->b_data,
 			    arc_buf_size(buf));
+jcb_local[1] = gethrtime();
+calclock(jcb_local, &jcb_t, &jcb_c);
 		}
 	} else {
+hrtime_t jcc_local[2];
+jcc_local[0] = gethrtime();
+	
 		ASSERT3P(buf->b_data, ==, abd_to_buf(zio->io_orig_abd));
 		ASSERT3U(zio->io_orig_size, ==, arc_buf_size(buf));
 		ASSERT3U(hdr->b_l1hdr.b_bufcnt, ==, 1);
 
 		arc_share_buf(hdr, buf);
+jcc_local[1] = gethrtime();
+calclock(jcc_local, &jcc_t, &jcc_c);
 	}
-
+hrtime_t jcd_local[2];
+jcd_local[0] = gethrtime();
+	//JW
 	arc_hdr_verify(hdr, zio->io_bp);
 	spl_fstrans_unmark(cookie);
+jcd_local[1] = gethrtime();
+calclock(jcd_local, &jcd_t, &jcd_c);
+
+jc_local[1] = gethrtime();
+calclock(jc_local, &jc_t, &jc_c);
+
+j_local[1] = gethrtime();
+calclock(j_local, &j_t, &j_c);
 }
 
 static void

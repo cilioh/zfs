@@ -67,7 +67,14 @@ struct proc p0;
  */
 
 pthread_cond_t kthread_cond = PTHREAD_COND_INITIALIZER;
+//JW
+int mutex = 1;
 pthread_mutex_t kthread_lock = PTHREAD_MUTEX_INITIALIZER;
+
+//int mutex = 0;
+//pthread_spinlock_t kthread_lock = PTHREAD_MUTEX_INITIALIZER;
+
+
 pthread_key_t kthread_key;
 int kthread_nr = 0;
 
@@ -101,7 +108,10 @@ thread_fini(void)
 	umem_free(kt, sizeof (kthread_t));
 
 	/* Wait for all threads to exit via thread_exit() */
-	VERIFY3S(pthread_mutex_lock(&kthread_lock), ==, 0);
+	if(mutex)
+		VERIFY3S(pthread_mutex_lock(&kthread_lock), ==, 0);
+	else
+		VERIFY3S(pthread_spin_lock(&kthread_lock), ==, 0);
 
 	kthread_nr--; /* Main thread is exiting */
 
@@ -109,7 +119,10 @@ thread_fini(void)
 		VERIFY0(pthread_cond_wait(&kthread_cond, &kthread_lock));
 
 	ASSERT3S(kthread_nr, ==, 0);
-	VERIFY3S(pthread_mutex_unlock(&kthread_lock), ==, 0);
+	if(mutex)
+		VERIFY3S(pthread_mutex_unlock(&kthread_lock), ==, 0);
+	else
+		VERIFY3S(pthread_spin_unlock(&kthread_lock), ==, 0);
 
 	VERIFY3S(pthread_key_delete(kthread_key), ==, 0);
 }
@@ -131,12 +144,20 @@ zk_thread_helper(void *arg)
 
 	VERIFY3S(pthread_setspecific(kthread_key, kt), ==, 0);
 
-	VERIFY3S(pthread_mutex_lock(&kthread_lock), ==, 0);
+	if(mutex)
+		VERIFY3S(pthread_mutex_lock(&kthread_lock), ==, 0);
+	else
+		VERIFY3S(pthread_spin_lock(&kthread_lock), ==, 0);
+
 	kthread_nr++;
-	VERIFY3S(pthread_mutex_unlock(&kthread_lock), ==, 0);
+	if(mutex)
+		VERIFY3S(pthread_mutex_unlock(&kthread_lock), ==, 0);
+	else
+		VERIFY3S(pthread_spin_unlock(&kthread_lock), ==, 0);
 	(void) setpriority(PRIO_PROCESS, 0, kt->t_pri);
 
 	kt->t_tid = pthread_self();
+//JW: this is calling taskq_thread function
 	((thread_func_arg_t)kt->t_func)(kt->t_arg);
 
 	/* Unreachable, thread must exit with thread_exit() */
@@ -189,7 +210,7 @@ zk_thread_create(caddr_t stk, size_t stksize, thread_func_t func, void *arg,
 	 */
 	VERIFY0(pthread_attr_setstacksize(&attr, stksize));
 	VERIFY0(pthread_attr_setguardsize(&attr, PAGESIZE));
-
+//JW: calling zk_thread_helper function
 	VERIFY0(pthread_create(&kt->t_tid, &attr, &zk_thread_helper, kt));
 	VERIFY0(pthread_attr_destroy(&attr));
 
@@ -205,9 +226,15 @@ zk_thread_exit(void)
 
 	umem_free(kt, sizeof (kthread_t));
 
-	VERIFY0(pthread_mutex_lock(&kthread_lock));
+	if(mutex)
+		VERIFY0(pthread_mutex_lock(&kthread_lock));
+	else
+		VERIFY0(pthread_spin_lock(&kthread_lock));
 	kthread_nr--;
-	VERIFY0(pthread_mutex_unlock(&kthread_lock));
+	if(mutex)
+		VERIFY0(pthread_mutex_unlock(&kthread_lock));
+	else
+		VERIFY0(pthread_spin_unlock(&kthread_lock));
 
 	VERIFY0(pthread_cond_broadcast(&kthread_cond));
 	pthread_exit((void *)TS_MAGIC);
@@ -295,7 +322,10 @@ mutex_init(kmutex_t *mp, char *name, int type, void *cookie)
 	ASSERT3P(cookie, ==, NULL);
 	mp->m_owner = MTX_INIT;
 	mp->m_magic = MTX_MAGIC;
-	VERIFY3S(pthread_mutex_init(&mp->m_lock, NULL), ==, 0);
+	if(mutex)
+		VERIFY3S(pthread_mutex_init(&mp->m_lock, NULL), ==, 0);
+	else
+		VERIFY3S(pthread_spin_init(&mp->s_lock, NULL), ==, 0);
 }
 
 void
@@ -303,7 +333,10 @@ mutex_destroy(kmutex_t *mp)
 {
 	ASSERT3U(mp->m_magic, ==, MTX_MAGIC);
 	ASSERT3P(mp->m_owner, ==, MTX_INIT);
-	ASSERT0(pthread_mutex_destroy(&(mp)->m_lock));
+	if(mutex)
+		ASSERT0(pthread_mutex_destroy(&(mp)->m_lock));
+	else
+		ASSERT0(pthread_spin_destroy(&(mp)->s_lock));
 	mp->m_owner = MTX_DEST;
 	mp->m_magic = 0;
 }
@@ -314,7 +347,10 @@ mutex_enter(kmutex_t *mp)
 	ASSERT3U(mp->m_magic, ==, MTX_MAGIC);
 	ASSERT3P(mp->m_owner, !=, MTX_DEST);
 	ASSERT3P(mp->m_owner, !=, curthread);
-	VERIFY3S(pthread_mutex_lock(&mp->m_lock), ==, 0);
+	if(mutex)
+		VERIFY3S(pthread_mutex_lock(&mp->m_lock), ==, 0);
+	else
+		VERIFY3S(pthread_spin_lock(&mp->s_lock), ==, 0);
 	ASSERT3P(mp->m_owner, ==, MTX_INIT);
 	mp->m_owner = curthread;
 }
@@ -325,7 +361,12 @@ mutex_tryenter(kmutex_t *mp)
 	int err;
 	ASSERT3U(mp->m_magic, ==, MTX_MAGIC);
 	ASSERT3P(mp->m_owner, !=, MTX_DEST);
-	if (0 == (err = pthread_mutex_trylock(&mp->m_lock))) {
+	if(mutex)
+		err = pthread_mutex_trylock(&mp->m_lock);
+	else
+		err = pthread_spin_trylock(&mp->s_lock);
+//	if (0 == (err = pthread_mutex_trylock(&mp->m_lock))) {
+	if (0 == err) {
 		ASSERT3P(mp->m_owner, ==, MTX_INIT);
 		mp->m_owner = curthread;
 		return (1);
@@ -341,7 +382,10 @@ mutex_exit(kmutex_t *mp)
 	ASSERT3U(mp->m_magic, ==, MTX_MAGIC);
 	ASSERT3P(mutex_owner(mp), ==, curthread);
 	mp->m_owner = MTX_INIT;
-	VERIFY3S(pthread_mutex_unlock(&mp->m_lock), ==, 0);
+	if(mutex)
+		VERIFY3S(pthread_mutex_unlock(&mp->m_lock), ==, 0);
+	else
+		VERIFY3S(pthread_spin_unlock(&mp->s_lock), ==, 0);
 }
 
 void *
